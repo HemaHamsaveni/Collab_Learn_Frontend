@@ -8,6 +8,10 @@ const MyGroups = () => {
   const token = localStorage.getItem("token");
 
   const [groups, setGroups] = useState([]);
+  
+  // ✨ NEW: State to hold the user's specific subjects ✨
+  const [userSubjects, setUserSubjects] = useState([]);
+  
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -36,7 +40,27 @@ const MyGroups = () => {
 
   useEffect(() => {
     fetchUserGroups();
+    fetchUserSubjects(); // ✨ Fetch user subjects when page loads ✨
   }, []);
+
+  // ✨ NEW: Fetch logged-in user's subjects from their profile ✨
+  const fetchUserSubjects = async () => {
+    try {
+        const response = await fetch(`http://localhost:8082/api/users/${userId}/profile`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.selectedSubjects) {
+                // Extract just the names and sort them alphabetically
+                const subjects = data.selectedSubjects.map(s => s.name).sort();
+                setUserSubjects(subjects);
+            }
+        }
+    } catch (err) {
+        console.error("Failed to fetch user subjects", err);
+    }
+  };
 
   const fetchUserGroups = async () => {
     try {
@@ -48,7 +72,6 @@ const MyGroups = () => {
         
         const formattedGroups = data.map(g => {
             const daysStr = g.sessionDays?.join(', ') || '';
-            // Apply 12-hour formatting here!
             const startTime = formatTime12hr(g.sessionTimeFrom);
             const endTime = formatTime12hr(g.sessionTimeTo);
             const timeStr = (startTime || endTime) ? `${startTime} - ${endTime}` : '';
@@ -117,7 +140,6 @@ const MyGroups = () => {
     }
   };
 
-  // ✨ NEW: Handle Delete Group ✨
   const handleDeleteGroup = async (group) => {
     if (window.confirm(`WARNING: Are you sure you want to permanently delete "${group.name}"? This action cannot be undone.`)) {
         try {
@@ -152,21 +174,6 @@ const MyGroups = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const allSubjects = [
-    "Ad Hoc and Sensor Networks", "Advanced Algorithms", "Advanced Web Technology", "Agile Methodologies", 
-    "Artificial Intelligence", "Big Data Analytics", "Blockchain Technology", "Business Analytics", "C Programming", 
-    "Cloud Computing", "Compiler Design", "Computer Architecture", "Computer Graphics", "Computer Networks", 
-    "Computer Vision", "Cryptography and Network Security", "Cyber Security", "Data Analytics", "Data Science", 
-    "Data Structures", "Database Management Systems (DBMS)", "Deep Learning", "Design and Analysis of Algorithms", 
-    "Digital Logic and Design", "Discrete Mathematics", "Distributed Systems", "Engineering Chemistry", 
-    "Engineering Graphics", "Engineering Physics", "Ethics in Data Science", "Game Design", "Green Computing", 
-    "Human Computer Interaction", "Information Retrieval", "Information Security", "Internet of Things (IoT)", 
-    "Java Programming (OOPs)", "Linear Algebra", "Machine Learning", "Mobile App Development", "Multimedia Systems", 
-    "Natural Language Processing (NLP)", "Operating Systems", "Probability and Statistics", "Professional Ethics", 
-    "Python Programming", "Reinforcement Learning", "Social Network Analysis", "Software Engineering", 
-    "Software Project Management", "Software Testing", "Statistics for Data Science", "Theory of Computation", 
-    "User Interface Design (UI/UX)", "Virtual and Augmented Reality", "Web Development (Full Stack)", "Web Technology"
-  ];
   const studyGoals = ["Concept Understanding", "Exam Preparation", "Revision & Practice", "Project / Assignment Support", "Skill Improvement", "Doubt Clearing"];
   const learningStylesList = ["Visual (Images, diagrams)", "Auditory (Listening, discussing)", "Reading/Writing", "Kinesthetic (Hands-on)"];
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -201,7 +208,6 @@ const MyGroups = () => {
                 <div className="flex gap-3 mt-auto">
                     <button onClick={() => openDetails(group)} className="flex-1 border border-[#1ABC9C] text-[#1ABC9C] py-2 rounded-lg text-sm font-medium hover:bg-teal-50">View Details</button>
                     
-                    {/* ✨ Conditionally Render Delete or Leave based on Role ✨ */}
                     {group.role === 'Creator' ? (
                         <button onClick={() => handleDeleteGroup(group)} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-sm font-medium hover:bg-red-100">Delete Group</button>
                     ) : (
@@ -229,8 +235,16 @@ const MyGroups = () => {
                         <label className="block text-xs font-bold text-gray-500 mb-1">Subject</label>
                         <select required name="subject" value={newGroup.subject} onChange={handleInputChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-[#1ABC9C] bg-white text-black">
                             <option value="">Select Subject</option>
-                            {allSubjects.map((sub, idx) => <option key={idx} value={sub}>{sub}</option>)}
+                            {/* ✨ MAPPING ONLY OVER THE USER'S OWN SUBJECTS ✨ */}
+                            {userSubjects.length === 0 ? (
+                                <option value="" disabled>No subjects in your profile!</option>
+                            ) : (
+                                userSubjects.map((sub, idx) => <option key={idx} value={sub}>{sub}</option>)
+                            )}
                         </select>
+                        {userSubjects.length === 0 && (
+                            <p className="text-[10px] text-red-500 mt-1 font-bold">Please add subjects to your Profile first.</p>
+                        )}
                     </div>
                     <div className="flex gap-4">
                         <div className="flex-1">
@@ -293,7 +307,10 @@ const MyGroups = () => {
                         )}
                     </div>
                     
-                    <button type="submit" className="w-full bg-[#1ABC9C] text-white py-3 rounded-xl font-bold mt-4 hover:bg-[#16a085] shadow-md">Create Group</button>
+                    {/* ✨ Automatically disable the button if they have no subjects ✨ */}
+                    <button type="submit" disabled={userSubjects.length === 0} className={`w-full py-3 rounded-xl font-bold mt-4 shadow-md transition-colors ${userSubjects.length === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#1ABC9C] text-white hover:bg-[#16a085]'}`}>
+                        Create Group
+                    </button>
                 </form>
             </div>
         </div>
@@ -353,7 +370,6 @@ const MyGroups = () => {
                         <button onClick={() => { setShowDetailsModal(false); navigate('/dashboard/schedule'); }} className="flex-1 bg-[#1e3a8a] text-white py-3 rounded-xl font-bold hover:bg-[#172554] flex items-center justify-center gap-2"><Calendar size={18} /> View Schedule</button>
                     </div>
 
-                    {/* ✨ Conditionally Render Delete/Leave at the bottom of the modal ✨ */}
                     <div className="pt-2">
                         <button 
                             onClick={() => selectedGroup.role === 'Creator' ? handleDeleteGroup(selectedGroup) : handleLeaveGroup(selectedGroup)}

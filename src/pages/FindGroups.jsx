@@ -22,65 +22,27 @@ const FindGroups = () => {
   
   const dayDropdownRef = useRef(null);
 
-  const formatTime12hr = (time24) => {
-    if (!time24) return '';
-    const [hour, minute] = time24.split(':');
-    const h = parseInt(hour, 10);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    return `${h12}:${minute} ${ampm}`;
-  };
-
-  // Helper to map backend data to UI format
-  const mapBackendDataToUI = (data) => {
-    return data.map(g => {
-        const daysStr = g.sessionDays?.join(', ') || '';
-        const startTime = formatTime12hr(g.sessionTimeFrom);
-        const endTime = formatTime12hr(g.sessionTimeTo);
-        const timeStr = (startTime || endTime) ? `${startTime} - ${endTime}` : '';
-        
-        return {
-            id: g.id,
-            name: g.name,
-            subject: g.subject,
-            level: g.skillLevel || "Any",
-            score: "Pending", 
-            compatibility: { subject: "Pending...", skill: "Pending...", schedule: "Pending...", overall: "Pending..." },
-            goal: g.studyGoal || "General Study",
-            membersList: g.members.map(m => ({
-                name: m.name,
-                role: m.id === g.admin.id ? "Creator" : "Member",
-                level: m.id === g.admin.id ? g.skillLevel : "Pending"
-            })),
-            creationDate: new Date(g.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-            sessionDetails: daysStr && timeStr ? `${daysStr} • ${timeStr}` : (daysStr || timeStr || "TBD"),
-            currentMembers: g.members.length,
-            maxMembers: g.maxCapacity
-        };
-    });
-  };
-
   // Fetch all on initial load
   useEffect(() => {
     fetchAllGroups();
   }, []);
 
+  // ✨ UPDATED: Direct endpoint with userId and no mapping needed ✨
   const fetchAllGroups = async () => {
     try {
-      const response = await fetch("http://localhost:8082/api/groups/all", {
+      const response = await fetch(`http://localhost:8082/api/groups/all/${userId}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (response.ok) {
         const data = await response.json();
-        setAllGroups(mapBackendDataToUI(data));
+        setAllGroups(data); // Backend DTO perfectly matches frontend state!
       }
     } catch (err) { console.error(err); }
   };
 
-  // ✨ NEW: Handle Apply Filters ✨
+  // ✨ UPDATED: Search endpoint with userId ✨
   const handleApplyFilters = async () => {
     try {
-        // Construct the URL Query Parameters
         const params = new URLSearchParams();
         if (filterSubject && filterSubject !== "Any") params.append("subject", filterSubject);
         if (filterSkillLevel && filterSkillLevel !== "Any") params.append("skillLevel", filterSkillLevel);
@@ -88,13 +50,13 @@ const FindGroups = () => {
         if (filterSize && filterSize !== "Any") params.append("size", filterSize);
         if (selectedDays.length > 0) params.append("days", selectedDays.join(","));
 
-        const response = await fetch(`http://localhost:8082/api/groups/search?${params.toString()}`, {
+        const response = await fetch(`http://localhost:8082/api/groups/search/${userId}?${params.toString()}`, {
             headers: { "Authorization": `Bearer ${token}` }
         });
 
         if (response.ok) {
             const data = await response.json();
-            setAllGroups(mapBackendDataToUI(data));
+            setAllGroups(data);
         }
     } catch (err) {
         console.error("Filter Search Failed:", err);
@@ -118,8 +80,7 @@ const FindGroups = () => {
         if (response.ok) {
             setJoinSuccessMsg(`Successfully joined ${groupName}! Check 'My Groups'.`);
             setSelectedGroup(null); 
-            // Re-run the current search to update the UI
-            handleApplyFilters(); 
+            handleApplyFilters(); // Refresh list via filters to keep accurate scores/counts
             setTimeout(() => setJoinSuccessMsg(''), 4000);
         } else {
             const errorText = await response.text();
@@ -137,7 +98,7 @@ const FindGroups = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-const allSubjects = [
+  const allSubjects = [
     "Ad Hoc and Sensor Networks", "Advanced Algorithms", "Advanced Web Technology", "Agile Methodologies", 
     "Artificial Intelligence", "Big Data Analytics", "Blockchain Technology", "Business Analytics", "C Programming", 
     "Cloud Computing", "Compiler Design", "Computer Architecture", "Computer Graphics", "Computer Networks", 
@@ -152,8 +113,8 @@ const allSubjects = [
     "Software Project Management", "Software Testing", "Statistics for Data Science", "Theory of Computation", 
     "User Interface Design (UI/UX)", "Virtual and Augmented Reality", "Web Development (Full Stack)", "Web Technology"
   ];
-const studyGoals = ["Concept Understanding", "Exam Preparation", "Revision & Practice", "Project / Assignment Support", "Skill Improvement", "Doubt Clearing"];
-const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const studyGoals = ["Concept Understanding", "Exam Preparation", "Revision & Practice", "Project / Assignment Support", "Skill Improvement", "Doubt Clearing"];
+  const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
     <div className="flex flex-col h-full relative">
@@ -238,7 +199,6 @@ const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
                 )}
              </div>
              
-             {/* ✨ Wire up Apply Filters button ✨ */}
              <button onClick={handleApplyFilters} className="bg-[#1ABC9C] text-white px-5 py-2 rounded-lg font-medium hover:bg-[#16a085] flex items-center justify-center gap-2 h-10 w-full lg:w-auto">
                 <Filter size={16} /> Apply
              </button>
