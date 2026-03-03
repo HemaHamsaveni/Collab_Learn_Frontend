@@ -7,8 +7,11 @@ import Register from "./pages/Register";
 import ProfileSetup from "./pages/ProfileSetup";
 import DashboardHome from "./pages/DashboardHome"; 
 import ProfileSummary from "./pages/ProfileSummary";
-import MyGroups from "./pages/MyGroups"; // NEW
-import FindGroups from "./pages/FindGroups"; // NEW
+import MyGroups from "./pages/MyGroups"; 
+import FindGroups from "./pages/FindGroups"; 
+
+// --- NEWLY ADDED PAGE FOR PHASE 4 ---
+import StudyResources from "./pages/StudyResources"; // Make sure the path matches where you saved it
 
 // --- COMPONENTS ---
 import DashboardLayout from "./components/DashboardLayout"; 
@@ -34,12 +37,14 @@ function App() {
           {/* Profile Summary Page */}
           <Route path="profile" element={<ProfileSummary />} /> 
           
-          {/* Newly Added Group Pages */}
+          {/* Group Management */}
           <Route path="my-groups" element={<MyGroups />} />
           <Route path="find-groups" element={<FindGroups />} />
           
-          {/* Placeholders for Future Phases */}
-          <Route path="resources" element={<div className="p-8 text-xl font-bold">Study Resources Coming Soon!</div>} />
+          {/* ✅ PHASE 4: AI Study Resources (Updated from placeholder) */}
+          <Route path="resources" element={<StudyResources />} />
+          
+          {/* Placeholder for Future Phase */}
           <Route path="schedule" element={<div className="p-8 text-xl font-bold">Schedule Coming Soon!</div>} />
           
         </Route>
