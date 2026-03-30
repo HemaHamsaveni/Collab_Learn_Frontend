@@ -9,9 +9,10 @@ import DashboardHome from "./pages/DashboardHome";
 import ProfileSummary from "./pages/ProfileSummary";
 import MyGroups from "./pages/MyGroups"; 
 import FindGroups from "./pages/FindGroups"; 
+import StudyResources from "./pages/StudyResources"; 
 
-// --- NEWLY ADDED PAGE FOR PHASE 4 ---
-import StudyResources from "./pages/StudyResources"; // Make sure the path matches where you saved it
+// --- NEWLY ADDED PAGE FOR PHASE 5 ---
+import Schedule from "./pages/Schedule"; 
 
 // --- COMPONENTS ---
 import DashboardLayout from "./components/DashboardLayout"; 
@@ -41,11 +42,11 @@ function App() {
           <Route path="my-groups" element={<MyGroups />} />
           <Route path="find-groups" element={<FindGroups />} />
           
-          {/* ✅ PHASE 4: AI Study Resources (Updated from placeholder) */}
+          {/* Phase 4: AI Study Resources */}
           <Route path="resources" element={<StudyResources />} />
           
-          {/* Placeholder for Future Phase */}
-          <Route path="schedule" element={<div className="p-8 text-xl font-bold">Schedule Coming Soon!</div>} />
+          {/* ✅ PHASE 5: Scheduling & Sessions (Updated from placeholder) */}
+          <Route path="schedule" element={<Schedule />} />
           
         </Route>
       </Routes>

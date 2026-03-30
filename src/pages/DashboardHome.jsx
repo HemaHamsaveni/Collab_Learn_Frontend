@@ -1,25 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, CheckCircle, Clock, Flame, ArrowRight, Users, Zap } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Flame, ArrowRight, Users, Zap, Video } from 'lucide-react';
 
 const DashboardHome = () => {
   const navigate = useNavigate();
 
   // 1. STATE TO HOLD DATABASE DATA
   const [profile, setProfile] = useState(null);
+  const [myGroupsData, setMyGroupsData] = useState([]);
+  const [upcomingSessionsData, setUpcomingSessionsData] = useState([]);
+  const [sessionStats, setSessionStats] = useState({ total: 0, completed: 0, left: 0 });
   const [loading, setLoading] = useState(true);
   
   // 2. STATE TO HOLD REAL-TIME CLOCK
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // ✨ 3. STATE FOR USER'S CUSTOM STREAK GOAL (Defaults to 5)
+  // 3. STATE FOR USER'S CUSTOM STREAK GOAL
   const [streakGoal, setStreakGoal] = useState(() => {
     return Number(localStorage.getItem('userStreakGoal')) || 5;
   });
 
   // 4. FETCH REAL DATA FROM SPRING BOOT
   useEffect(() => {
-    const fetchProfileData = async () => {
+    const fetchDashboardData = async () => {
       const token = localStorage.getItem("token");
       const userId = localStorage.getItem("userId");
 
@@ -29,26 +32,61 @@ const DashboardHome = () => {
       }
 
       try {
-        const response = await fetch(`http://localhost:8082/api/users/${userId}/profile`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}` 
+        const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+
+        // Fetch Profile
+        const profileRes = await fetch(`http://localhost:8082/api/users/${userId}/profile`, { headers });
+        if (profileRes.ok) {
+          setProfile(await profileRes.json());
+        }
+
+        // Fetch Groups
+        const groupsRes = await fetch(`http://localhost:8082/api/groups/user/${userId}`, { headers });
+        let groups = [];
+        if (groupsRes.ok) {
+          groups = await groupsRes.json();
+          setMyGroupsData(groups.slice(0, 3)); // Show top 3 groups on dashboard
+        }
+
+        // Fetch Sessions & Calculate Stats
+        let allSessions = [];
+        let completedCount = 0;
+        let upcomingCount = 0;
+
+        for (const group of groups) {
+          const sessionRes = await fetch(`http://localhost:8082/api/sessions/group/${group.id}`, { headers });
+          if (sessionRes.ok) {
+            const groupSessions = await sessionRes.json();
+            groupSessions.forEach(session => {
+              allSessions.push({ ...session, groupName: group.name, subject: group.subject });
+              if (session.status === 'COMPLETED') completedCount++;
+              if (session.status === 'UPCOMING') upcomingCount++;
+            });
           }
+        }
+
+        setSessionStats({
+            total: allSessions.length,
+            completed: completedCount,
+            left: upcomingCount
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          setProfile(data);
-        }
+        // Filter for UPCOMING, sort by date, and grab the next 4 for the table
+        const upcoming = allSessions
+            .filter(s => s.status === 'UPCOMING')
+            .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime))
+            .slice(0, 4);
+        
+        setUpcomingSessionsData(upcoming);
+
       } catch (err) {
-        console.error("Failed to fetch profile", err);
+        console.error("Failed to fetch dashboard data", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProfileData();
+    fetchDashboardData();
   }, [navigate]);
 
   // 5. START THE REAL-TIME CLOCK TICKER
@@ -57,34 +95,23 @@ const DashboardHome = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const stats = {
-    totalSessions: 45,
-    completed: 32,
-    left: 13
-  };
-
-  const upcomingSchedule = [
-    { id: 1, date: "Today", time: "6:00 PM", subject: "Java Programming", group: "Java Masters" },
-    { id: 2, date: "Tomorrow", time: "10:00 AM", subject: "DBMS", group: "DB Designers" },
-    { id: 3, date: "Nov 20", time: "5:00 PM", subject: "Web Technology", group: "Web Dev Squad" },
-  ];
-
-  const myGroups = [
-    { name: "Java Masters", subject: "Java Programming" },
-    { name: "DB Designers", subject: "Database Management" },
-    { name: "Web Dev Squad", subject: "Web Technology" },
-  ];
-
-  // ✨ CUSTOM GOAL HANDLER ✨
+  // --- HELPERS ---
   const handleGoalChange = (e) => {
     const newGoal = Number(e.target.value);
     setStreakGoal(newGoal);
     localStorage.setItem('userStreakGoal', newGoal);
   };
 
-  // ✨ CALCULATE STREAK PROGRESS ✨
+  const formatDateTime = (isoString) => {
+    if (!isoString) return { date: 'TBD', time: 'TBD' };
+    const d = new Date(isoString);
+    return {
+        date: d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+        time: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+  };
+
   const actualStreak = profile?.streakCount || 1;
-  // Math.min ensures the bar doesn't go over 100% if they pass their goal!
   const streakProgress = Math.min(Math.round((actualStreak / streakGoal) * 100), 100);
 
   if (loading) {
@@ -96,14 +123,12 @@ const DashboardHome = () => {
       
       {/* 1. HEADER: REAL-TIME CLOCK AND DATE */}
       <div className="flex justify-between items-center mb-2">
-         {/* LEFT: Live Time */}
          <div className="bg-white px-5 py-2.5 rounded-xl border border-gray-200 shadow-sm">
             <p className="text-sm text-gray-600 font-bold flex items-center gap-2">
                 <Clock className="text-brandSecondary" size={16} />
                 {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
          </div>
-         {/* RIGHT: Live Date */}
          <div className="bg-white px-5 py-2.5 rounded-xl border border-gray-200 shadow-sm">
             <p className="text-sm text-gray-600 font-bold flex items-center gap-2">
                 <Calendar className="text-brandSecondary" size={16} />
@@ -115,7 +140,7 @@ const DashboardHome = () => {
       {/* 2. STATS GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* ✨ UPDATED: CUSTOM GOAL WIDGET ✨ */}
+        {/* CUSTOM GOAL WIDGET */}
         <div className="bg-white p-6 rounded-2xl border border-brandSecondary shadow-sm flex flex-col justify-center">
            <div className="flex justify-between items-center mb-2">
               <h3 className="font-bold text-lg flex items-center gap-2"><Flame className="text-orange-500" size={20}/> Days on Streak</h3>
@@ -125,7 +150,6 @@ const DashboardHome = () => {
            <div className="mt-2">
               <div className="flex justify-between items-center text-xs text-gray-500 font-bold mb-1.5 px-1">
                  <span>Current</span>
-                 {/* ✨ The hidden dropdown to set their goal! ✨ */}
                  <select 
                     value={streakGoal} 
                     onChange={handleGoalChange}
@@ -157,16 +181,16 @@ const DashboardHome = () => {
            <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><CheckCircle className="text-brandSecondary" size={20}/> Study Progress</h3>
            <div className="grid grid-cols-3 gap-4">
               <div className="bg-blue-50 p-4 rounded-xl text-center">
-                 <p className="text-3xl font-bold text-blue-900">{stats.totalSessions}</p>
+                 <p className="text-3xl font-bold text-blue-900">{sessionStats.total}</p>
                  <p className="text-xs text-blue-600 font-bold uppercase mt-1">Total Sessions</p>
               </div>
               <div className="bg-green-50 p-4 rounded-xl text-center">
-                 <p className="text-3xl font-bold text-green-900">{stats.completed}</p>
+                 <p className="text-3xl font-bold text-green-900">{sessionStats.completed}</p>
                  <p className="text-xs text-green-600 font-bold uppercase mt-1">Completed</p>
               </div>
               <div className="bg-orange-50 p-4 rounded-xl text-center">
-                 <p className="text-3xl font-bold text-orange-900">{stats.left}</p>
-                 <p className="text-xs text-orange-600 font-bold uppercase mt-1">Sessions Left</p>
+                 <p className="text-3xl font-bold text-orange-900">{sessionStats.left}</p>
+                 <p className="text-xs text-orange-600 font-bold uppercase mt-1">Upcoming</p>
               </div>
            </div>
         </div>
@@ -176,24 +200,30 @@ const DashboardHome = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          
          {/* My Groups List */}
-         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-lg">My Groups</h3>
                 <button onClick={() => navigate('/dashboard/my-groups')} className="text-sm text-brandSecondary font-bold hover:underline">View All</button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {myGroups.map((group, idx) => (
-                    <div key={idx} className="border border-gray-200 p-4 rounded-xl hover:border-brandSecondary transition-colors cursor-pointer bg-gray-50 flex flex-col justify-center">
-                        <div className="flex items-center gap-2 mb-1">
-                           <Users size={16} className="text-brandSecondary" />
-                           <h4 className="font-bold text-sm truncate text-gray-800">{group.name}</h4>
-                        </div>
-                        <p className="text-xs text-gray-500 pl-6">{group.subject}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+                {myGroupsData.length === 0 ? (
+                    <div className="col-span-3 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 font-bold text-sm h-full min-h-[100px]">
+                        No groups yet. Join one to get started!
                     </div>
-                ))}
+                ) : (
+                    myGroupsData.map((group, idx) => (
+                        <div key={idx} onClick={() => navigate('/dashboard/my-groups')} className="border border-gray-200 p-4 rounded-xl hover:border-brandSecondary transition-colors cursor-pointer bg-gray-50 flex flex-col justify-center">
+                            <div className="flex items-center gap-2 mb-1">
+                               <Users size={16} className="text-brandSecondary shrink-0" />
+                               <h4 className="font-bold text-sm truncate text-gray-800">{group.name}</h4>
+                            </div>
+                            <p className="text-xs text-gray-500 pl-6 truncate">{group.subject}</p>
+                        </div>
+                    ))
+                )}
                 
-                {/* Find More Placeholder */}
-                <div onClick={() => navigate('/dashboard/find-groups')} className="border-2 border-dashed border-gray-300 p-4 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 text-gray-400 hover:text-brandSecondary hover:border-brandSecondary transition-all">
+                {/* Find More Button */}
+                <div onClick={() => navigate('/dashboard/find-groups')} className="border-2 border-dashed border-gray-300 p-4 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 text-gray-400 hover:text-brandSecondary hover:border-brandSecondary transition-all min-h-[80px]">
                     <p className="text-xs font-bold">+ Find More</p>
                 </div>
             </div>
@@ -201,7 +231,6 @@ const DashboardHome = () => {
 
          {/* RIGHT COLUMN: Study Resources & Discover */}
          <div className="flex flex-col gap-6">
-             
              {/* Study Resources Card */}
              <div className="bg-gradient-to-br from-teal-50 to-white p-5 rounded-2xl border border-teal-100 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
@@ -230,7 +259,6 @@ const DashboardHome = () => {
                  {/* Decorative background circle */}
                  <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-blue-900 rounded-full opacity-50"></div>
              </div>
-
          </div>
       </div>
 
@@ -246,31 +274,43 @@ const DashboardHome = () => {
                      <tr>
                          <th className="p-4">Date</th>
                          <th className="p-4">Time</th>
-                         <th className="p-4">Subject</th>
+                         <th className="p-4">Topic</th>
                          <th className="p-4">Group Name</th>
                          <th className="p-4">Action</th>
                      </tr>
                  </thead>
                  <tbody className="divide-y divide-gray-100">
-                     {upcomingSchedule.map((item) => (
-                         <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                             <td className="p-4 font-bold text-gray-700 flex items-center gap-2"><Calendar size={14} /> {item.date}</td>
-                             <td className="p-4 text-gray-600"><span className="flex items-center gap-1"><Clock size={14}/> {item.time}</span></td>
-                             <td className="p-4 text-gray-900 font-medium">{item.subject}</td>
-                             <td className="p-4 text-gray-500">{item.group}</td>
-                             <td className="p-4">
-                                 <button className="text-brandSecondary font-bold text-xs border border-brandSecondary px-3 py-1 rounded hover:bg-teal-50">Join</button>
+                     {upcomingSessionsData.length === 0 ? (
+                         <tr>
+                             <td colSpan="5" className="p-8 text-center text-gray-400 font-medium border-none">
+                                 No upcoming sessions. Schedule one in your groups!
                              </td>
                          </tr>
-                     ))}
+                     ) : (
+                         upcomingSessionsData.map((session) => {
+                             const { date, time } = formatDateTime(session.scheduledTime);
+                             return (
+                                 <tr key={session.id} className="hover:bg-gray-50 transition-colors">
+                                     <td className="p-4 font-bold text-gray-700 flex items-center gap-2"><Calendar size={14} /> {date}</td>
+                                     <td className="p-4 text-gray-600"><span className="flex items-center gap-1"><Clock size={14}/> {time}</span></td>
+                                     <td className="p-4 text-gray-900 font-medium truncate max-w-[200px]">{session.topic}</td>
+                                     <td className="p-4 text-gray-500">{session.groupName}</td>
+                                     <td className="p-4">
+                                         {session.meetingLink ? (
+                                             <a href={session.meetingLink} target="_blank" rel="noreferrer" className="text-brandSecondary font-bold text-xs border border-brandSecondary px-3 py-1 rounded hover:bg-teal-50 flex items-center gap-1 w-fit">
+                                                 <Video size={12}/> Join
+                                             </a>
+                                         ) : (
+                                             <span className="text-gray-400 text-xs font-medium">No Link</span>
+                                         )}
+                                     </td>
+                                 </tr>
+                             );
+                         })
+                     )}
                  </tbody>
              </table>
          </div>
-      </div>
-
-      {/* 5. QUOTE FOOTER */}
-      <div className="text-center py-4">
-          <p className="text-gray-400 italic text-sm">"Don't watch the clock; do what it does - keep going."</p>
       </div>
 
     </div>
