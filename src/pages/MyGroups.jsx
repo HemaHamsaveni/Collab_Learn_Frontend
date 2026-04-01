@@ -62,7 +62,7 @@ const MyGroups = () => {
     }
   };
 
-  const fetchUserGroups = async () => {
+ const fetchUserGroups = async () => {
     try {
       const response = await fetch(`http://localhost:8082/api/groups/user/${userId}`, {
         headers: { "Authorization": `Bearer ${token}` }
@@ -86,10 +86,12 @@ const MyGroups = () => {
                 createdOn: new Date(g.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
                 goal: g.studyGoal,
                 sessionDetails: daysStr && timeStr ? `${daysStr} • ${timeStr}` : (daysStr || timeStr || "TBD"),
+                
+                // ✨ UPDATED: Now reads m.skill from the backend instead of hardcoding "Pending"
                 membersList: g.members.map(m => ({
                     name: m.name,
                     role: m.id === g.admin.id ? "Creator" : "Member",
-                    skill: m.id === g.admin.id ? g.skillLevel : "Pending" 
+                    skill: m.id === g.admin.id ? g.skillLevel : (m.skill || "Unknown") 
                 }))
             };
         });
