@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X, Calendar, User, BookOpen, Clock, Target, Check, LogOut, ChevronDown, MessageCircle, Trash2 } from 'lucide-react';
+import { Plus, X, Calendar, User, BookOpen, Clock, Target, Check, LogOut, ChevronDown, MessageCircle, Trash2, Crown, AlertTriangle } from 'lucide-react';
 
 const MyGroups = () => {
   const navigate = useNavigate();
@@ -8,12 +8,15 @@ const MyGroups = () => {
   const token = localStorage.getItem("token");
 
   const [groups, setGroups] = useState([]);
-  
-  // ✨ NEW: State to hold the user's specific subjects ✨
   const [userSubjects, setUserSubjects] = useState([]);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  
+  // ✨ NEW: State for the Delete / Transfer Ownership Modal
+  const [showDeleteTransferModal, setShowDeleteTransferModal] = useState(false);
+  const [newLeaderId, setNewLeaderId] = useState('');
+
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
   
@@ -28,7 +31,6 @@ const MyGroups = () => {
     name: '', subject: '', membersCount: '', studyGoal: '', learningStyle: [], skillLevel: 'Intermediate'
   });
 
-  // --- TIME FORMATTER (24h to 12h AM/PM) ---
   const formatTime12hr = (time24) => {
     if (!time24) return '';
     const [hour, minute] = time24.split(':');
@@ -40,10 +42,9 @@ const MyGroups = () => {
 
   useEffect(() => {
     fetchUserGroups();
-    fetchUserSubjects(); // ✨ Fetch user subjects when page loads ✨
+    fetchUserSubjects(); 
   }, []);
 
-  // ✨ NEW: Fetch logged-in user's subjects from their profile ✨
   const fetchUserSubjects = async () => {
     try {
         const response = await fetch(`http://localhost:8082/api/users/${userId}/profile`, {
@@ -52,7 +53,6 @@ const MyGroups = () => {
         if (response.ok) {
             const data = await response.json();
             if (data.selectedSubjects) {
-                // Extract just the names and sort them alphabetically
                 const subjects = data.selectedSubjects.map(s => s.name).sort();
                 setUserSubjects(subjects);
             }
@@ -62,7 +62,7 @@ const MyGroups = () => {
     }
   };
 
- const fetchUserGroups = async () => {
+  const fetchUserGroups = async () => {
     try {
       const response = await fetch(`http://localhost:8082/api/groups/user/${userId}`, {
         headers: { "Authorization": `Bearer ${token}` }
@@ -87,8 +87,8 @@ const MyGroups = () => {
                 goal: g.studyGoal,
                 sessionDetails: daysStr && timeStr ? `${daysStr} • ${timeStr}` : (daysStr || timeStr || "TBD"),
                 
-                // ✨ UPDATED: Now reads m.skill from the backend instead of hardcoding "Pending"
                 membersList: g.members.map(m => ({
+                    id: m.id, 
                     name: m.name,
                     role: m.id === g.admin.id ? "Creator" : "Member",
                     skill: m.id === g.admin.id ? g.skillLevel : (m.skill || "Unknown") 
@@ -143,13 +143,14 @@ const MyGroups = () => {
   };
 
   const handleDeleteGroup = async (group) => {
-    if (window.confirm(`WARNING: Are you sure you want to permanently delete "${group.name}"? This action cannot be undone.`)) {
+    if (window.confirm(`WARNING: Are you absolutely sure you want to permanently delete "${group.name}"? This will remove the group for all members.`)) {
         try {
             const response = await fetch(`http://localhost:8082/api/groups/${group.id}/delete/${userId}`, {
                 method: "DELETE",
                 headers: { "Authorization": `Bearer ${token}` }
             });
             if (response.ok) {
+                setShowDeleteTransferModal(false);
                 setShowDetailsModal(false);
                 showToast(`Deleted group ${group.name}`);
                 fetchUserGroups(); 
@@ -158,7 +159,40 @@ const MyGroups = () => {
     }
   };
 
+  // ✨ UPDATED: Now called directly from the new Management Modal
+  const handleTransferOwnership = async (groupId, newAdminId) => {
+    try {
+        const response = await fetch(`http://localhost:8082/api/groups/${groupId}/transfer/${userId}/${newAdminId}`, {
+            method: "PUT",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            setShowDeleteTransferModal(false);
+            setShowDetailsModal(false);
+            setNewLeaderId(''); // Reset selection
+            showToast(data.message);
+            fetchUserGroups(); // Refresh to see your new downgraded status
+        } else {
+            const errData = await response.json();
+            alert(errData.error || "Failed to transfer ownership.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Server error.");
+    }
+  };
+
   const openDetails = (group) => { setSelectedGroup(group); setShowDetailsModal(true); };
+  
+  // ✨ Helper to open the Management/Delete modal
+  const openDeleteTransferManager = (group) => { 
+      setSelectedGroup(group); 
+      setNewLeaderId('');
+      setShowDeleteTransferModal(true); 
+  };
+
   const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
   const handleInputChange = (e) => setNewGroup({ ...newGroup, [e.target.name]: e.target.value });
   
@@ -211,7 +245,7 @@ const MyGroups = () => {
                     <button onClick={() => openDetails(group)} className="flex-1 border border-[#1ABC9C] text-[#1ABC9C] py-2 rounded-lg text-sm font-medium hover:bg-teal-50">View Details</button>
                     
                     {group.role === 'Creator' ? (
-                        <button onClick={() => handleDeleteGroup(group)} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-sm font-medium hover:bg-red-100">Delete Group</button>
+                        <button onClick={() => openDeleteTransferManager(group)} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-sm font-medium hover:bg-red-100">Manage / Delete</button>
                     ) : (
                         <button onClick={() => handleLeaveGroup(group)} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-sm font-medium hover:bg-red-100">Leave Group</button>
                     )}
@@ -220,15 +254,16 @@ const MyGroups = () => {
         ))}
       </div>
 
+      {/* CREATE GROUP MODAL */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
                 <div className="bg-[#1e3a8a] p-5 text-white flex justify-between items-center shrink-0">
                     <h2 className="text-xl font-bold">Create New Group</h2>
                     <button onClick={() => setShowCreateModal(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
-                </div>
-                
+                </div> 
                 <form onSubmit={handleCreateGroup} className="p-6 space-y-4 overflow-y-auto">
+                    {/* ... (Create Group Form remains exactly the same) ... */}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Group Name</label>
                         <input required name="name" value={newGroup.name} onChange={handleInputChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-[#1ABC9C]" placeholder="e.g. Java Masters" />
@@ -237,7 +272,6 @@ const MyGroups = () => {
                         <label className="block text-xs font-bold text-gray-500 mb-1">Subject</label>
                         <select required name="subject" value={newGroup.subject} onChange={handleInputChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-[#1ABC9C] bg-white text-black">
                             <option value="">Select Subject</option>
-                            {/* ✨ MAPPING ONLY OVER THE USER'S OWN SUBJECTS ✨ */}
                             {userSubjects.length === 0 ? (
                                 <option value="" disabled>No subjects in your profile!</option>
                             ) : (
@@ -280,7 +314,7 @@ const MyGroups = () => {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Study Goal</label>
                         <select required name="studyGoal" value={newGroup.studyGoal} onChange={handleInputChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-[#1ABC9C] bg-white text-black">
@@ -309,7 +343,6 @@ const MyGroups = () => {
                         )}
                     </div>
                     
-                    {/* ✨ Automatically disable the button if they have no subjects ✨ */}
                     <button type="submit" disabled={userSubjects.length === 0} className={`w-full py-3 rounded-xl font-bold mt-4 shadow-md transition-colors ${userSubjects.length === 0 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#1ABC9C] text-white hover:bg-[#16a085]'}`}>
                         Create Group
                     </button>
@@ -318,8 +351,9 @@ const MyGroups = () => {
         </div>
       )}
 
+      {/* VIEW DETAILS MODAL */}
       {showDetailsModal && selectedGroup && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
                 <div className="bg-[#1e3a8a] p-6 text-white flex items-start gap-4 relative shrink-0">
                     <button onClick={() => setShowDetailsModal(false)} className="absolute top-6 left-6 hover:bg-white/20 p-1 rounded-full"><X size={24} /></button>
@@ -358,8 +392,12 @@ const MyGroups = () => {
                                     {selectedGroup.membersList?.map((member, idx) => (
                                         <tr key={idx} className="hover:bg-gray-50">
                                             <td className="p-3 text-gray-800 font-medium">{member.name}</td>
-                                            <td className="p-3"><span className={`text-xs px-2 py-1 rounded-full font-bold ${member.role === 'Creator' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>{member.role}</span></td>
-                                            <td className="p-3 text-gray-600">{member.skill}</td>
+                                            <td className="p-3">
+                                                <span className={`text-xs px-2 py-1 rounded-full font-bold ${member.role === 'Creator' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {member.role}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-gray-600 capitalize">{member.skill}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -373,17 +411,79 @@ const MyGroups = () => {
                     </div>
 
                     <div className="pt-2">
+                        {/* ✨ Changed to open the Management Modal instead of instant delete */}
                         <button 
-                            onClick={() => selectedGroup.role === 'Creator' ? handleDeleteGroup(selectedGroup) : handleLeaveGroup(selectedGroup)}
+                            onClick={() => selectedGroup.role === 'Creator' ? openDeleteTransferManager(selectedGroup) : handleLeaveGroup(selectedGroup)}
                             className="w-full border-2 border-red-100 text-red-500 py-3 rounded-xl font-bold hover:bg-red-50 flex items-center justify-center gap-2 transition-colors"
                         >
-                            {selectedGroup.role === 'Creator' ? <><Trash2 size={18} /> Delete Group</> : <><LogOut size={18} /> Leave Group</>}
+                            {selectedGroup.role === 'Creator' ? <><Trash2 size={18} /> Manage / Delete Group</> : <><LogOut size={18} /> Leave Group</>}
                         </button>
                     </div>
                 </div>
             </div>
         </div>
       )}
+
+      {/* ✨ NEW: MANAGEMENT & DELETE MODAL ✨ */}
+      {showDeleteTransferModal && selectedGroup && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="bg-red-600 p-5 text-white flex justify-between items-center">
+                    <h2 className="font-bold flex items-center gap-2"><AlertTriangle size={18}/> Manage Group</h2>
+                    <button onClick={() => setShowDeleteTransferModal(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20}/></button>
+                </div>
+                
+                <div className="p-6 space-y-6">
+                    {/* OPTION 1: Transfer Ownership */}
+                    <div>
+                        <h3 className="font-bold text-gray-900 mb-2 flex items-center gap-2"><Crown size={18} className="text-amber-500"/> Transfer Ownership</h3>
+                        <p className="text-xs text-gray-600 mb-3">Instead of deleting, you can transfer leadership to another member and become a regular member yourself.</p>
+                        
+                        {selectedGroup.membersList.filter(m => m.role !== 'Creator').length === 0 ? (
+                            <p className="text-sm font-bold text-amber-600 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                                You are the only member in this group! You must invite others before you can transfer ownership.
+                            </p>
+                        ) : (
+                            <div className="flex gap-2">
+                                <select 
+                                    value={newLeaderId} 
+                                    onChange={(e) => setNewLeaderId(e.target.value)}
+                                    className="flex-1 border border-gray-300 rounded-xl p-2 text-sm outline-none focus:border-[#1ABC9C] bg-white text-black"
+                                >
+                                    <option value="">Select a member...</option>
+                                    {selectedGroup.membersList.filter(m => m.role !== 'Creator').map(m => (
+                                        <option key={m.id} value={m.id}>{m.name}</option>
+                                    ))}
+                                </select>
+                                <button 
+                                    onClick={() => handleTransferOwnership(selectedGroup.id, newLeaderId)}
+                                    disabled={!newLeaderId}
+                                    className="bg-amber-100 text-amber-700 px-4 py-2 rounded-xl font-bold text-sm hover:bg-amber-200 disabled:opacity-50 transition-colors"
+                                >
+                                    Transfer
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-100 my-2"></div>
+
+                    {/* OPTION 2: Permanently Delete */}
+                    <div>
+                        <h3 className="font-bold text-red-600 mb-2 flex items-center gap-2"><Trash2 size={18} /> Permanently Delete</h3>
+                        <p className="text-xs text-gray-600 mb-4">This will permanently remove the group, all past session data, and kick all current members. This action cannot be undone.</p>
+                        <button 
+                            onClick={() => handleDeleteGroup(selectedGroup)}
+                            className="w-full bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl font-bold hover:bg-red-100 transition-colors"
+                        >
+                            I understand, Delete Group
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };
