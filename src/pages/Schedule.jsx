@@ -21,6 +21,13 @@ const Schedule = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [newSession, setNewSession] = useState({ groupId: '', topic: '', date: '', time: '', meetingLink: '' });
 
+  // ✨ NEW: States for Toast Notifications
+  const [toastMsg, setToastMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000); };
+  const showError = (msg) => { setErrorMsg(msg); setTimeout(() => setErrorMsg(''), 3000); };
+
   useEffect(() => {
     fetchAllUserSessions();
   }, []);
@@ -45,16 +52,14 @@ const Schedule = () => {
           if (sessionRes.ok) {
             const groupSessions = await sessionRes.json();
             
-            // ✨ THE MAGIC: Calculate personal attendance status for the UI
             const mappedSessions = groupSessions.map(session => {
                 const isCreator = session.studyGroup?.admin?.id === Number(userId);
                 let userStatus = session.status;
                 
                 if (session.status === 'COMPLETED') {
-                    // Check if they clicked join (or if they are the creator who hosted it)
                     const attended = session.attendees?.some(a => a.id === Number(userId));
                     if (!attended && !isCreator) {
-                        userStatus = 'MISSED'; // They didn't show up!
+                        userStatus = 'MISSED'; 
                     }
                 } else if (session.status === 'CANCELLED') {
                     userStatus = 'MISSED';
@@ -77,16 +82,15 @@ const Schedule = () => {
     }
   };
 
-  // ✨ NEW: Opens the meeting AND records attendance in the background
   const handleJoinSession = async (session) => {
-      window.open(session.meetingLink, '_blank'); // Open meeting instantly
+      window.open(session.meetingLink, '_blank'); 
       
       try {
           await fetch(`http://localhost:8082/api/sessions/${session.id}/attend/${userId}`, {
               method: 'POST',
               headers: { "Authorization": `Bearer ${token}` }
           });
-          fetchAllUserSessions(); // Refresh data quietly
+          fetchAllUserSessions(); 
       } catch (err) {
           console.error("Failed to record attendance", err);
       }
@@ -108,12 +112,13 @@ const Schedule = () => {
         if (response.ok) {
             setCreateModalOpen(false);
             setNewSession({ groupId: '', topic: '', date: '', time: '', meetingLink: '' });
+            showToast("Meeting scheduled successfully!");
             fetchAllUserSessions();
         } else {
-            alert("Failed to schedule session.");
+            showError("Failed to schedule session.");
         }
     } catch (error) {
-        console.error(error);
+        showError("Server Error.");
     } finally {
         setIsCreating(false);
     }
@@ -132,10 +137,13 @@ const Schedule = () => {
       if (response.ok) {
         const data = await response.json();
         setGeneratedSummary(data.aiSummary);
+        showToast("Session completed and AI Summary generated!");
         fetchAllUserSessions(); 
+      } else {
+        showError("Failed to generate summary.");
       }
     } catch (error) {
-      console.error(error);
+      showError("Server Error.");
     } finally {
       setAiGenerating(false);
     }
@@ -160,7 +168,7 @@ const Schedule = () => {
   const getStatusColor = (userStatus) => {
     if (userStatus === 'UPCOMING') return 'text-blue-600 bg-blue-50 border-blue-200';
     if (userStatus === 'COMPLETED') return 'text-green-600 bg-green-50 border-green-200';
-    return 'text-red-600 bg-red-50 border-red-200'; // For MISSED
+    return 'text-red-600 bg-red-50 border-red-200';
   };
 
   const filters = ['All', 'UPCOMING', 'COMPLETED', 'MISSED'];
@@ -175,6 +183,18 @@ const Schedule = () => {
 
   return (
     <div className="h-full relative pb-4">
+      {/* ✨ TOAST NOTIFICATIONS */}
+      {toastMsg && (
+        <div className="fixed top-6 right-6 bg-[#1ABC9C] text-white px-6 py-3 rounded-xl shadow-lg z-[100] flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300">
+            <CheckCircle size={20} /> <span className="font-bold">{toastMsg}</span>
+        </div>
+      )}
+      {errorMsg && (
+        <div className="fixed top-6 right-6 bg-red-500 text-white px-6 py-3 rounded-xl shadow-lg z-[100] flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300">
+            <X size={20} /> <span className="font-bold">{errorMsg}</span>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
             <h2 className="text-2xl font-bold text-black">Your Study Sessions</h2>
@@ -221,7 +241,6 @@ const Schedule = () => {
                       <div className="flex-1 w-full">
                           <div className="flex items-center gap-3 mb-1">
                               <h3 className="font-bold text-lg">{groupName}</h3>
-                              {/* Uses dynamic personalized userStatus */}
                               <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${getStatusColor(session.userStatus)}`}>
                                   {displayFilterName(session.userStatus)}
                               </span>
@@ -246,7 +265,6 @@ const Schedule = () => {
                                     </button>
                                   )}
                                   
-                                  {/* ✨ ONLY THE CREATOR CAN SEE THE FINISH BUTTON */}
                                   {session.isCreator && (
                                     <button 
                                       onClick={() => { setSelectedSessionToComplete(session); setCompleteModalOpen(true); }}

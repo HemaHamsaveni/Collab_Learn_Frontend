@@ -1,17 +1,32 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Search, Users, BookOpen, Calendar, LogOut, UserCircle, ChevronDown, User } from 'lucide-react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'; // ✨ ADDED useLocation
+import { LayoutDashboard, Search, Users, BookOpen, Calendar, LogOut, UserCircle, ChevronDown, User, Check } from 'lucide-react'; // ✨ ADDED Check
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // ✨ NEW
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState(''); // ✨ NEW
   const profileRef = useRef(null);
   
-  // ✨ Dynamically grab the real logged-in user's details from Local Storage
+  // Dynamically grab the real logged-in user's details from Local Storage
   const user = { 
     username: localStorage.getItem("userName") || "Student", 
     email: localStorage.getItem("userEmail") || "student@example.com" 
   };
+
+  // ✨ Catch success messages from Login or Register
+  useEffect(() => {
+    if (location.state && location.state.message) {
+      setToastMessage(location.state.message);
+      
+      // Clear the message from history so it doesn't show again on refresh
+      window.history.replaceState({}, document.title);
+
+      // Hide toast after 3 seconds
+      setTimeout(() => setToastMessage(''), 3000);
+    }
+  }, [location]);
 
   const handleLogout = () => {
     localStorage.clear(); // Clear the VIP wristband!
@@ -39,9 +54,17 @@ const DashboardLayout = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-white font-sans overflow-hidden relative">
+      
+      {/* ✨ TOAST NOTIFICATION */}
+      {toastMessage && (
+        <div className="fixed top-6 right-6 bg-[#1ABC9C] text-white px-6 py-3 rounded-xl shadow-lg z-[100] flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300">
+            <Check size={20} /> <span className="font-bold">{toastMessage}</span>
+        </div>
+      )}
+
       {/* SIDEBAR */}
-      <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col justify-between p-4">
+      <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col justify-between p-4 z-10">
         <div>
           <div className="flex items-center gap-2 mb-8 px-2">
             <img src="/logo.png" alt="CollabLearn" className="w-10 h-10 object-contain" />
@@ -82,7 +105,7 @@ const DashboardLayout = () => {
       </div>
 
       {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 z-10">
         {/* HEADER */}
         <div className="h-20 border-b border-gray-100 flex items-center justify-between px-8 bg-white shrink-0 z-20">
           <div>
@@ -96,7 +119,6 @@ const DashboardLayout = () => {
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center gap-3 hover:bg-gray-50 p-2 rounded-xl transition-colors outline-none"
             >
-                {/* Dynamically uses the first letter of their username for the avatar! */}
                 <div className="w-10 h-10 rounded-full border-2 border-brandSecondary bg-gray-100 overflow-hidden flex items-center justify-center text-brandSecondary font-bold text-lg uppercase">
                     {user.username.charAt(0)}
                 </div>

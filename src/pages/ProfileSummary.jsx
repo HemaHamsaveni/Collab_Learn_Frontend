@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Plus, Trash2, Save } from 'lucide-react';
+import { Edit, Plus, Trash2, Save, Check, X } from 'lucide-react'; // ✨ ADDED Check and X
 
 const ProfileSummary = () => {
   const [isGlobalEditing, setIsGlobalEditing] = useState(false);
@@ -12,6 +12,10 @@ const ProfileSummary = () => {
   const [timeFrom, setTimeFrom] = useState('');
   const [timeTo, setTimeTo] = useState('');
   const [progress, setProgress] = useState(0);
+
+  // ✨ NEW: States for Toast Notifications
+  const [toastMsg, setToastMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // ✨ REAL BACKEND FETCH ✨
   useEffect(() => {
@@ -103,12 +107,15 @@ const ProfileSummary = () => {
             });
             
             if(response.ok) {
-              console.log("Saved to backend!");
+              setToastMsg("Profile saved successfully! 🎉");
+              setTimeout(() => setToastMsg(''), 3000);
             } else {
-              console.error("Failed to save changes");
+              setErrorMsg("Failed to save changes.");
+              setTimeout(() => setErrorMsg(''), 3000);
             }
         } catch(e) { 
-          console.warn("Could not reach backend"); 
+          setErrorMsg("Could not connect to the server.");
+          setTimeout(() => setErrorMsg(''), 3000);
         }
         setIsGlobalEditing(false); 
     } else {
@@ -154,11 +161,24 @@ const ProfileSummary = () => {
     return <div className="h-full flex items-center justify-center font-bold text-gray-400">Loading Profile Data...</div>;
   }
 
-  // ✨ Get the first letter for the static avatar
+  // Get the first letter for the static avatar
   const initialLetter = (formDetails.fullName || profileData.username || "U").charAt(0).toUpperCase();
 
   return (
-    <div className="h-full bg-white font-sans overflow-hidden flex flex-col">
+    <div className="h-full bg-white font-sans overflow-hidden flex flex-col relative">
+      
+      {/* ✨ TOAST NOTIFICATIONS */}
+      {toastMsg && (
+        <div className="fixed top-6 right-6 bg-[#1ABC9C] text-white px-6 py-3 rounded-xl shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300">
+            <Check size={20} /> <span className="font-bold">{toastMsg}</span>
+        </div>
+      )}
+      {errorMsg && (
+        <div className="fixed top-6 right-6 bg-red-500 text-white px-6 py-3 rounded-xl shadow-lg z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300">
+            <X size={20} /> <span className="font-bold">{errorMsg}</span>
+        </div>
+      )}
+
       <div className="mb-1 shrink-0 px-2 pt-0 flex justify-between items-end">
          <div>
              <h1 className="text-3xl font-extrabold text-black">Profile Summary</h1>
@@ -174,11 +194,11 @@ const ProfileSummary = () => {
          </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0 overflow-y-auto pb-4 px-2">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0 overflow-y-auto pb-4 px-2 mt-4">
         <div className="flex flex-col gap-3">
           <div className={`border-2 ${isGlobalEditing ? 'border-brandSecondary' : 'border-gray-200'} rounded-2xl p-4 relative flex items-center gap-4 shrink-0 mb-2 transition-colors`}>
              
-             {/* ✨ STATIC AVATAR */}
+             {/* STATIC AVATAR */}
              <div className="w-20 h-20 rounded-full border-2 border-brandSecondary bg-gray-100 flex items-center justify-center text-brandSecondary font-bold text-4xl shrink-0">
                 {initialLetter}
              </div>
@@ -233,7 +253,7 @@ const ProfileSummary = () => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 h-full overflow-y-auto pr-1">
            {isGlobalEditing && (
                <div>
                  <label className="block text-xs font-bold text-gray-700 mb-1 ml-1">Add Subjects</label>

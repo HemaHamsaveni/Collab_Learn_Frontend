@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, X, Calendar, User, BookOpen, Clock, Target, Check, LogOut, ChevronDown, MessageCircle, Trash2, Crown, AlertTriangle } from 'lucide-react';
 
+// ✨ NEW: Import the ChatModal
+import ChatModal from '../components/ChatModal';
+
 const MyGroups = () => {
   const navigate = useNavigate();
   const userId = localStorage.getItem("userId");
@@ -13,7 +16,11 @@ const MyGroups = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   
-  // ✨ NEW: State for the Delete / Transfer Ownership Modal
+  // ✨ NEW: State for the Chat Modal
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatGroupData, setChatGroupData] = useState({ id: null, name: '' });
+  
+  // State for the Delete / Transfer Ownership Modal
   const [showDeleteTransferModal, setShowDeleteTransferModal] = useState(false);
   const [newLeaderId, setNewLeaderId] = useState('');
 
@@ -159,7 +166,6 @@ const MyGroups = () => {
     }
   };
 
-  // ✨ UPDATED: Now called directly from the new Management Modal
   const handleTransferOwnership = async (groupId, newAdminId) => {
     try {
         const response = await fetch(`http://localhost:8082/api/groups/${groupId}/transfer/${userId}/${newAdminId}`, {
@@ -171,9 +177,9 @@ const MyGroups = () => {
             const data = await response.json();
             setShowDeleteTransferModal(false);
             setShowDetailsModal(false);
-            setNewLeaderId(''); // Reset selection
+            setNewLeaderId(''); 
             showToast(data.message);
-            fetchUserGroups(); // Refresh to see your new downgraded status
+            fetchUserGroups(); 
         } else {
             const errData = await response.json();
             alert(errData.error || "Failed to transfer ownership.");
@@ -186,7 +192,6 @@ const MyGroups = () => {
 
   const openDetails = (group) => { setSelectedGroup(group); setShowDetailsModal(true); };
   
-  // ✨ Helper to open the Management/Delete modal
   const openDeleteTransferManager = (group) => { 
       setSelectedGroup(group); 
       setNewLeaderId('');
@@ -263,7 +268,6 @@ const MyGroups = () => {
                     <button onClick={() => setShowCreateModal(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={20} /></button>
                 </div> 
                 <form onSubmit={handleCreateGroup} className="p-6 space-y-4 overflow-y-auto">
-                    {/* ... (Create Group Form remains exactly the same) ... */}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-1">Group Name</label>
                         <input required name="name" value={newGroup.name} onChange={handleInputChange} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:border-[#1ABC9C]" placeholder="e.g. Java Masters" />
@@ -406,12 +410,20 @@ const MyGroups = () => {
                     </div>
                     
                     <div className="flex gap-3">
-                        <button onClick={() => alert("Opening Group Chat...")} className="flex-1 bg-[#1ABC9C] text-white py-3 rounded-xl font-bold hover:bg-[#16a085] flex items-center justify-center gap-2"><MessageCircle size={18} /> Group Chat</button>
+                        <button 
+                            onClick={() => {
+                                setShowDetailsModal(false);
+                                setChatGroupData({ id: selectedGroup.id, name: selectedGroup.name });
+                                setShowChatModal(true);
+                            }}
+                            className="flex-1 bg-[#1ABC9C] text-white py-3 rounded-xl font-bold hover:bg-[#16a085] flex items-center justify-center gap-2"
+                        >
+                            <MessageCircle size={18} /> Group Chat
+                        </button>
                         <button onClick={() => { setShowDetailsModal(false); navigate('/dashboard/schedule'); }} className="flex-1 bg-[#1e3a8a] text-white py-3 rounded-xl font-bold hover:bg-[#172554] flex items-center justify-center gap-2"><Calendar size={18} /> View Schedule</button>
                     </div>
 
                     <div className="pt-2">
-                        {/* ✨ Changed to open the Management Modal instead of instant delete */}
                         <button 
                             onClick={() => selectedGroup.role === 'Creator' ? openDeleteTransferManager(selectedGroup) : handleLeaveGroup(selectedGroup)}
                             className="w-full border-2 border-red-100 text-red-500 py-3 rounded-xl font-bold hover:bg-red-50 flex items-center justify-center gap-2 transition-colors"
@@ -424,7 +436,7 @@ const MyGroups = () => {
         </div>
       )}
 
-      {/* ✨ NEW: MANAGEMENT & DELETE MODAL ✨ */}
+      {/* MANAGEMENT & DELETE MODAL */}
       {showDeleteTransferModal && selectedGroup && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -482,6 +494,15 @@ const MyGroups = () => {
                 </div>
             </div>
         </div>
+      )}
+
+      {/* ✨ NEW: CHAT MODAL ✨ */}
+      {showChatModal && chatGroupData.id && (
+          <ChatModal 
+              groupId={chatGroupData.id} 
+              groupName={chatGroupData.name} 
+              onClose={() => setShowChatModal(false)} 
+          />
       )}
 
     </div>

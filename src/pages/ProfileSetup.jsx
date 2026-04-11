@@ -15,6 +15,7 @@ const ProfileSetup = () => {
   const [profileData, setProfileData] = useState(initialData);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(""); // ✨ NEW: For inline error handling
 
   const [formDetails, setFormDetails] = useState({
     fullName: '', degree: '', specialization: '', semester: '', year: '', learningStyle: '', groupSize: ''
@@ -28,7 +29,7 @@ const ProfileSetup = () => {
 
   useEffect(() => {
     let completed = 0;
-    const totalFields = 11; // Reduced to 11 since we removed the image upload
+    const totalFields = 11;
     if (formDetails.fullName?.trim()) completed++;
     if (formDetails.degree) completed++;
     if (formDetails.specialization) completed++;
@@ -52,11 +53,10 @@ const ProfileSetup = () => {
   const handleSave = async () => {
     if (isSaving) return; 
     setIsSaving(true);    
+    setErrorMessage(""); // Clear old errors
 
     const token = localStorage.getItem("token");
     const userId = localStorage.getItem("userId");
-    
-    console.log("MY TOKEN IS: ", token); 
 
     const payload = { ...formDetails, selectedSubjects, selectedDays, timeFrom, timeTo };
     
@@ -71,17 +71,15 @@ const ProfileSetup = () => {
       }); 
 
       if (response.ok) {
-        alert("Profile Setup Complete!");
-        navigate('/dashboard'); 
+        // ✨ THE FIX: Navigate silently and pass the success message!
+        navigate('/dashboard', { state: { message: "Profile Setup Complete! 🎉" } }); 
       } else {
         const errorText = await response.text();
-        alert("Backend Error: " + errorText);
-        console.error("Backend Error:", errorText);
+        setErrorMessage(errorText || "Failed to save profile."); // Inline error
         setIsSaving(false); 
       }
     } catch (error) {
-      alert("Server offline or CORS error. Check console!");
-      console.error(error);
+      setErrorMessage("Server offline or network error. Please try again."); // Inline error
       setIsSaving(false); 
     }
   };
@@ -124,7 +122,6 @@ const ProfileSetup = () => {
   const clearTimeFrom = () => setTimeFrom('');
   const clearTimeTo = () => setTimeTo('');
 
-  // ✨ Get the first letter for the static avatar
   const initialLetter = (formDetails.fullName || profileData.username || "U").charAt(0).toUpperCase();
 
   return (
@@ -149,7 +146,6 @@ const ProfileSetup = () => {
                 {isEditing ? <Save className="w-5 h-5 text-brandSecondary" /> : <Edit className="w-4 h-4 text-black" />}
              </button>
 
-             {/* ✨ STATIC AVATAR */}
              <div className="w-20 h-20 rounded-full border-2 border-brandSecondary bg-gray-100 flex items-center justify-center text-brandSecondary font-bold text-4xl shrink-0">
                 {initialLetter}
              </div>
@@ -283,7 +279,10 @@ const ProfileSetup = () => {
         </div>
       </div>
 
-      <div className="mt-2 flex justify-end shrink-0">
+      <div className="mt-2 flex justify-end items-center shrink-0">
+         {/* ✨ Inline Error Message */}
+         {errorMessage && <p className="text-red-500 text-sm font-bold mr-4">{errorMessage}</p>}
+         
          <button 
            onClick={handleSave} 
            disabled={isSaving}

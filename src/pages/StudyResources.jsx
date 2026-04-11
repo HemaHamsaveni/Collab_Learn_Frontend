@@ -67,7 +67,6 @@ const StudyResources = () => {
     fetchUserSubjects();
   }, []);
 
-  // ✨ UPDATED: Logic to handle manual entry if fetch fails ✨
   const startChat = (selectedMode) => {
     setMode(selectedMode);
     setChatStep(1);
@@ -79,7 +78,6 @@ const StudyResources = () => {
 
     const newMessage = { type: 'bot', text: botGreeting };
 
-    // If we have subjects, show them as buttons. Otherwise, prompt manual typing.
     if (userSubjects.length > 0) {
         newMessage.options = userSubjects;
     } else {
@@ -89,17 +87,16 @@ const StudyResources = () => {
     setMessages([newMessage]);
   };
 
+  // ✨ UPDATED: Much stricter prompts
   const getAiInstruction = (currentMode, subject, topic, level, extraContext = "") => {
     if (currentMode === 'material') {
         return `You are an expert tutor creating a comprehensive study guide. 
                 Subject: ${subject} | Topic: ${topic} | Level: ${level}. ${extraContext}
-                Instructions: Write a detailed, conversational study guide with paragraphs and bullet points. 
-                DO NOT return a JSON array. Return normal, readable text.`;
+                CRITICAL INSTRUCTION: Write a detailed, conversational essay. DO NOT output a JSON array. DO NOT use JSON brackets. Write in normal readable paragraphs.`;
     } else {
         return `You are a quiz master generating flashcards.
                 Subject: ${subject} | Topic: ${topic} | Level: ${level}. ${extraContext}
-                Instructions: Generate concise flashcards. You MUST format response STRICTLY as a valid JSON array of objects with "title" and "content" keys. 
-                Return ONLY the JSON array without markdown code blocks.`;
+                CRITICAL INSTRUCTION: You MUST format response STRICTLY as a valid JSON array of objects with "title" and "content" keys. Return ONLY the JSON array without markdown code blocks.`;
     }
   };
 
@@ -120,16 +117,40 @@ const StudyResources = () => {
       if (response.ok) {
         let rawText = await response.text();
         
+        // Strip markdown wrappers (```json ... ```)
+        const cleanedText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
         if (payload.materialType === 'flashcards') {
-            rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
             try {
-                const parsedData = JSON.parse(rawText);
+                const parsedData = JSON.parse(cleanedText);
                 setMessages(prev => [...prev, { type: 'bot', text: 'Here are your flashcards:', data: parsedData }]);
             } catch (e) {
                 setMessages(prev => [...prev, { type: 'bot', text: 'AI formatting error. Please try regenerating.' }]);
             }
         } else {
-            setMessages(prev => [...prev, { type: 'bot', text: rawText }]);
+            // Mode is 'material' (Study Guide)
+            let formattedText = rawText;
+
+            // ✨ SMART FALLBACK: If the AI stubbornly returned JSON anyway, flatten it into beautiful paragraphs!
+            if (cleanedText.startsWith('[') || cleanedText.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(cleanedText);
+                    if (Array.isArray(parsed)) {
+                        formattedText = parsed.map(item => {
+                            const heading = item.title || item.topic || '';
+                            const body = item.content || item.description || '';
+                            return heading ? `📘 ${heading.toUpperCase()}\n${body}` : body;
+                        }).join('\n\n');
+                    }
+                } catch(e) {
+                    // Not valid JSON, which is fine! It will just render as normal text.
+                }
+            }
+
+            // Strip basic markdown asterisks for cleaner reading
+            formattedText = formattedText.replace(/\*\*/g, '');
+
+            setMessages(prev => [...prev, { type: 'bot', text: formattedText }]);
         }
       } else {
         setMessages(prev => [...prev, { type: 'bot', text: 'Error generating content.' }]);

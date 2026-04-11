@@ -17,6 +17,7 @@ export default function Login() {
   });
 
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState(""); // ✨ NEW: For inline success messages
   const [isLoading, setIsLoading] = useState(false);
 
   // Handlers for Login Form
@@ -32,6 +33,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMessage("");
+    setSuccessMessage("");
     setIsLoading(true);
 
     try {
@@ -49,8 +51,8 @@ export default function Login() {
         localStorage.setItem("userName", data.name);
         localStorage.setItem("userEmail", formData.email); 
 
-        alert(`Welcome back, ${data.name}!`);
-        navigate("/dashboard"); 
+        // ✨ THE FIX: Navigate silently and pass the success message to DashboardLayout!
+        navigate("/dashboard", { state: { message: "Welcome back! Login successful. 🎉" } }); 
         
       } else {
         const errorText = await response.text();
@@ -66,6 +68,7 @@ export default function Login() {
   const handlePasswordReset = async (e) => {
     e.preventDefault();
     setErrorMessage("");
+    setSuccessMessage("");
     setIsLoading(true);
 
     try {
@@ -76,7 +79,8 @@ export default function Login() {
       });
 
       if (response.ok) {
-        alert("Password reset successfully! Please log in.");
+        // ✨ Replaced alert with a clean inline success message
+        setSuccessMessage("Password reset successfully! Please log in.");
         setIsForgotPasswordMode(false); // Switch back to login view
         setResetData({ username: "", newPassword: "" }); // Clear the form
       } else {
@@ -105,7 +109,9 @@ export default function Login() {
           </div>
         </div>
 
+        {/* ✨ Inline Error and Success Messages */}
         {errorMessage && <p className="text-red-500 text-sm mb-4 text-center font-semibold">{errorMessage}</p>}
+        {successMessage && <p className="text-green-500 text-sm mb-4 text-center font-semibold">{successMessage}</p>}
 
         {!isForgotPasswordMode ? (
           /* LOGIN FORM */
@@ -132,7 +138,7 @@ export default function Login() {
             <div className="text-right pb-2">
               <button 
                 type="button"
-                onClick={() => { setIsForgotPasswordMode(true); setErrorMessage(""); }} 
+                onClick={() => { setIsForgotPasswordMode(true); setErrorMessage(""); setSuccessMessage(""); }} 
                 className="text-sm text-gray-500 hover:text-brandPrimary font-medium outline-none"
               >
                 forgot password?

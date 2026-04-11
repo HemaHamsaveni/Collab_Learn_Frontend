@@ -36,7 +36,7 @@ export default function Register() {
         localStorage.setItem("userName", data.name || formData.name);
         localStorage.setItem("userEmail", formData.email);
 
-        alert("Registration Successful! Let's set up your profile.");
+        // ✨ THE FIX: Silently glide to Profile Setup with no alert popup!
         navigate("/profile-setup"); 
       } else {
         const errorText = await response.text();
@@ -51,13 +51,13 @@ export default function Register() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-400 px-4">
-      <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative">
+      <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative transition-all duration-300">
         <Link to="/" className="absolute top-6 left-6 text-gray-500 hover:text-gray-800 text-xl font-bold">✕</Link>
 
         <div className="flex justify-between items-start mb-8 mt-4">
           <h2 className="text-4xl font-extrabold text-black">Register</h2>
           <div className="flex flex-col items-center">
-            <img src="/logo.png" alt="Logo" className="w-12 h-12" />
+            <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
             <span className="text-xs font-bold mt-1">CollabLearn</span>
           </div>
         </div>
@@ -97,7 +97,7 @@ export default function Register() {
             <button 
               type="submit" 
               disabled={isLoading}
-              className={`w-full text-white text-xl font-semibold py-4 rounded-full shadow-md transition ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-brandPrimary hover:bg-blue-900'}`}
+              className={`w-full text-white text-xl font-semibold py-4 rounded-full shadow-md transition-all ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-brandPrimary hover:bg-blue-900'}`}
             >
               {isLoading ? 'Registering...' : 'Register'}
             </button>

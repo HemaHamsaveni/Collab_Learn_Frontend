@@ -10,12 +10,10 @@ import ProfileSummary from "./pages/ProfileSummary";
 import MyGroups from "./pages/MyGroups"; 
 import FindGroups from "./pages/FindGroups"; 
 import StudyResources from "./pages/StudyResources"; 
-
-// --- NEWLY ADDED PAGE FOR PHASE 5 ---
 import Schedule from "./pages/Schedule"; 
 
 // --- COMPONENTS ---
-import DashboardLayout from "./components/DashboardLayout"; 
+import DashboardLayout from "./components/DashboardLayout";
 
 function App() {
   return (
@@ -28,7 +26,7 @@ function App() {
 
         {/* Standalone Setup Route */}
         <Route path="/profile-setup" element={<ProfileSetup />} />
-
+        
         {/* Protected Dashboard Routes (Wrapped in Layout) */}
         <Route path="/dashboard" element={<DashboardLayout />}>
           
@@ -45,7 +43,7 @@ function App() {
           {/* Phase 4: AI Study Resources */}
           <Route path="resources" element={<StudyResources />} />
           
-          {/* ✅ PHASE 5: Scheduling & Sessions (Updated from placeholder) */}
+          {/* Phase 5: Scheduling & Sessions */}
           <Route path="schedule" element={<Schedule />} />
           
         </Route>
